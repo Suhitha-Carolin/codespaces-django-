@@ -1,33 +1,75 @@
-{% load django_browser_reload %}
-{% load static %}
+from django.db import models
+from django.contrib.auth.models import User
 
-<!doctype html>
-<html lang="en">
-
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="GitHub Codespaces ♥️ Django">
-    <meta name="author" content="GitHub Codespaces">
-    <meta name="generator" content="GitHub Codespaces">
-    <meta name="theme-color" content="#000000">
-    <title>{% block title %}{{ title }} | GitHub Codespaces ♥️ Django{% endblock %}</title>
+class Station(models.Model):
+    code = models.CharField(max_length=5, unique=True)
+    name = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
     
-    <link rel="stylesheet" href="{% static 'main.css' %}">
-</head>
+    def __str__(self):
+        return f"{self.name} ({self.code})"
 
-<body>
-    <div class="App">
-        <header class="App-header">
-            <img src="{% static 'Octocat.png' %}" class="App-logo" alt="logo" />
-            <p>
-                GitHub Codespaces <span class="heart">♥️</span> Django
-            </p>
-            <p class="small">
-                Edit <code>hello_world/templates/index.html</code> and see changes live!
-            </p>
-        </header>
-    </div>
-</body>
+class Train(models.Model):
+    number = models.CharField(max_length=10, unique=True)
+    name = models.CharField(max_length=100)
+    source = models.ForeignKey(Station, related_name='departures', on_delete=models.CASCADE)
+    destination = models.ForeignKey(Station, related_name='arrivals', on_delete=models.CASCADE)
+    departure_time = models.TimeField()
+    arrival_time = models.TimeField()
+    duration = models.DurationField()
+    
+    def __str__(self):
+        return f"{self.name} ({self.number})"
 
-</html>
+class TrainClass(models.Model):
+    CLASS_CHOICES = [
+        ('SL', 'Sleeper'),
+        ('3A', 'AC 3 Tier'),
+        ('2A', 'AC 2 Tier'),
+        ('1A', 'AC First Class'),
+    ]
+    
+    train = models.ForeignKey(Train, related_name='classes', on_delete=models.CASCADE)
+    class_type = models.CharField(max_length=2, choices=CLASS_CHOICES)
+    fare = models.DecimalField(max_digits=8, decimal_places=2)
+    total_seats = models.PositiveIntegerField()
+    
+    class Meta:
+        unique_together = ('train', 'class_type')
+    
+    def __str__(self):
+        return f"{self.train.name} - {self.get_class_type_display()}"
+
+class Seat(models.Model):
+    train_class = models.ForeignKey(TrainClass, related_name='seats', on_delete=models.CASCADE)
+    seat_number = models.CharField(max_length=10)
+    is_booked = models.BooleanField(default=False)
+    
+    class Meta:
+        unique_together = ('train_class', 'seat_number')
+    
+    def __str__(self):
+        return f"{self.train_class} - Seat {self.seat_number}"
+
+class Booking(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    train = models.ForeignKey(Train, on_delete=models.CASCADE)
+    train_class = models.ForeignKey(TrainClass, on_delete=models.CASCADE)
+    journey_date = models.DateField()
+    booking_date = models.DateTimeField(auto_now_add=True)
+    total_fare = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    def __str__(self):
+        return f"Booking #{self.id} - {self.train}"
+
+class Passenger(models.Model):
+    booking = models.ForeignKey(Booking, related_name='passengers', on_delete=models.CASCADE)
+    seat = models.ForeignKey(Seat, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    age = models.PositiveIntegerField()
+    gender = models.CharField(max_length=10, choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')])
+    
+    def __str__(self):
+        return f"{self.name} - {self.seat}"
+```
+
